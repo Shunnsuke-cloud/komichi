@@ -6,7 +6,13 @@ import {
 
 type HandlerResult = Record<string, unknown> | string;
 
-type Handler = () => HandlerResult | Promise<HandlerResult>;
+
+type Params = Record<string, string>;
+
+type Handler = (
+  params: Params,
+) => HandlerResult | Promise<HandlerResult>;
+
 
 type Route = {
   method: string;
@@ -52,13 +58,27 @@ export class Komichi {
       "http://localhost",
     );
 
-    const route = this.routes.find(
-      (registeredRoute) =>
-        registeredRoute.method === method &&
-        registeredRoute.path === url.pathname,
-    );
+    let matchedRoute: Route | undefined;
+let params: Params = {};
 
-    if (!route) {
+for (const registeredRoute of this.routes) {
+  if (registeredRoute.method !== method) {
+    continue;
+  }
+
+    const matchedParams = this.matchPath(
+    registeredRoute.path,
+    url.pathname,
+  );
+
+  if (matchedParams !== null) {
+    matchedRoute = registeredRoute;
+    params = matchedParams;
+    break;
+  }
+}
+
+    if (!matchedRoute) {
       this.sendJson(response, 404, {
         message: "Route not found",
       });
@@ -67,7 +87,7 @@ export class Komichi {
     }
 
     try {
-      const result = await route.handler();
+      const result = await matchedRoute.handler(params);
 
       if (typeof result === "string") {
         this.sendText(response, 200, result);
@@ -83,6 +103,50 @@ export class Komichi {
       });
     }
   }
+
+  private matchPath(
+  routePath: string,
+  requestPath: string,
+): Params | null {
+  const routeParts = routePath
+    .split("/")
+    .filter((part) => part.length > 0);
+
+  const requestParts = requestPath
+    .split("/")
+    .filter((part) => part.length > 0);
+
+  if (routeParts.length !== requestParts.length) {
+    return null;
+  }
+
+  const params: Params = {};
+
+  for (let index = 0; index < routeParts.length; index++) {
+    const routePart = routeParts[index];
+    const requestPart = requestParts[index];
+
+    if (
+      routePart === undefined ||
+      requestPart === undefined
+    ) {
+      return null;
+    }
+
+    if (routePart.startsWith(":")) {
+      const paramName = routePart.slice(1);
+
+      params[paramName] = decodeURIComponent(requestPart);
+      continue;
+    }
+
+    if (routePart !== requestPart) {
+      return null;
+    }
+  }
+
+  return params;
+}
 
   private sendJson(
     response: ServerResponse,
