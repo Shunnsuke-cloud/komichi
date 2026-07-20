@@ -11,6 +11,14 @@ class BadRequestError extends Error {
   }
 }
 
+type RouteSuggestion = {
+  method: string;
+  path: string;
+  score: number;
+};
+
+
+
 type HandlerResult =
   | Record<string, unknown>
   | string;
@@ -29,26 +37,37 @@ type Route = {
   method: string;
   path: string;
   handler: Handler;
+  description?: string;
 };
 
 export class Komichi {
   private readonly routes: Route[] = [];
 
-  get(path: string, handler: Handler): void {
-    this.routes.push({
-      method: "GET",
-      path,
-      handler,
+    get(
+        path: string,
+        handler: Handler,
+        description?: string,
+        ): void {
+        this.routes.push({
+        method: "GET",
+        path,
+        handler,
+        description,
     });
-  }
+    }
 
-  post(path: string, handler: Handler): void {
-    this.routes.push({
-      method: "POST",
-      path,
-      handler,
+    post(
+        path: string,
+        handler: Handler,
+        description?: string,
+        ): void {
+        this.routes.push({
+        method: "POST",
+        path,
+        handler,
+        description,
     });
-  }
+    }
 
   listen(port: number): void {
     const server = createServer(
@@ -66,6 +85,49 @@ export class Komichi {
       );
     });
   }
+
+  printRoutes(): void {
+    console.log("");
+    console.log("Komichi Route Map");
+    console.log("------------------------------");
+
+    if (this.routes.length === 0) {
+        console.log("登録されているルートはありません");
+        console.log("");
+    return;
+    }
+
+    let methodWidth = Math.max(
+    ...this.routes.map((route) => route.method.length),
+    6,
+    );
+
+    const pathWidth = Math.max(
+    ...this.routes.map((route) => route.path.length),
+    4,
+    );
+
+    for (const route of this.routes) {
+        const method = route.method.padEnd(methodWidth);
+        const path = route.path.padEnd(pathWidth);
+
+        const description = route.description
+        ? `  ${route.description}`
+        : "";
+
+        console.log(
+         `${method}  ${path}${description}`,
+        );
+    }
+
+    console.log("------------------------------");
+
+    console.log(
+    `${this.routes.length} routes registered`,
+    );
+
+    console.log("");
+    }
 
   private async handleRequest(
     request: IncomingMessage,
@@ -119,10 +181,22 @@ export class Komichi {
     return;
     }
 
+    const suggestions = this.findRouteSuggestions(
+  method,
+  url.pathname,
+);
+
     this.sendJson(response, 404, {
     message: "Route not found",
     requestedMethod: method,
     requestedPath: url.pathname,
+    suggestions: suggestions.map((suggestion) => ({
+    method: suggestion.method,
+    path: suggestion.path,
+    similarity: Number(
+        suggestion.score.toFixed(2),
+        ),
+    })),
     });
 
     return;
@@ -238,6 +312,145 @@ export class Komichi {
         }
 
         return allowedMethods;
+    }
+
+    private calculateDistance(
+    left: string,
+    right: string,
+    ): number {
+    const rows = left.length + 1;
+    const columns = right.length + 1;
+
+    const matrix: number[][] = Array.from(
+    { length: rows },
+    () => Array<number>(columns).fill(0),
+    );
+
+    for (let row = 0; row < rows; row++) {
+        matrix[row]![0] = row;
+    }
+
+    for (let column = 0; column < columns; column++) {
+        matrix[0]![column] = column;
+    }
+
+    for (let row = 1; row < rows; row++) {
+        for (let column = 1; column < columns; column++) {
+            const cost =
+            left[row - 1] === right[column - 1]
+            ? 0
+            : 1;
+
+        matrix[row]![column] = Math.min(
+        matrix[row - 1]![column]! + 1,
+        matrix[row]![column - 1]! + 1,
+        matrix[row - 1]![column - 1]! + cost,
+        );
+    }
+    }
+
+    return matrix[left.length]![right.length]!;
+    }
+
+    private calculateSimilarity(
+    requestedPath: string,
+    registeredPath: string,
+    ): number {
+    const requestedParts = requestedPath
+    .split("/")
+    .filter((part) => part.length > 0);
+
+    const registeredParts = registeredPath
+    .split("/")
+    .filter((part) => part.length > 0);
+
+    const maximumLength = Math.max(
+    requestedParts.length,
+    registeredParts.length,
+    );
+
+    if (maximumLength === 0) {
+    return 1;
+    }
+
+    let totalScore = 0;
+
+    for (
+    let index = 0;
+    index < maximumLength;
+    index++
+    ) {
+        const requestedPart = requestedParts[index];
+        const registeredPart = registeredParts[index];
+
+    if (
+      requestedPart === undefined ||
+      registeredPart === undefined
+    ) {
+      continue;
+    }
+
+    if (registeredPart.startsWith(":")) {
+      totalScore += 1;
+      continue;
+    }
+
+        const distance = this.calculateDistance(
+        requestedPart.toLowerCase(),
+        registeredPart.toLowerCase(),
+    );
+
+    const longestLength = Math.max(
+      requestedPart.length,
+      registeredPart.length,
+    );
+
+    if (longestLength === 0) {
+      totalScore += 1;
+      continue;
+    }
+
+    totalScore +=
+      1 - distance / longestLength;
+    }
+
+    return totalScore / maximumLength;
+    }
+
+    private findRouteSuggestions(
+    method: string,
+    requestPath: string,
+    ): RouteSuggestion[] {
+    return this.routes
+    .map((route) => {
+        const score = this.calculateSimilarity(
+        requestPath,
+        route.path,
+        );
+
+        return {
+        method: route.method,
+        path: route.path,
+        score,
+        };
+        })
+        .filter((suggestion) => {
+        return suggestion.score >= 0.45;
+        })
+        .sort((left, right) => {
+        const leftMethodMatch =
+        left.method === method ? 1 : 0;
+
+        const rightMethodMatch =
+        right.method === method ? 1 : 0;
+
+        if (leftMethodMatch !== rightMethodMatch) {
+        return rightMethodMatch - leftMethodMatch;
+        }
+
+        return right.score - left.score;
+        })
+        .slice(0, 3);
     }
 
   private readJsonBody(
