@@ -58,7 +58,9 @@ type TrailInfo = {
   requestedPath: string;
   matchedPath?: string;
   params?: Params;
+  query?: URLSearchParams;
   statusCode: number;
+  responseType: ResponseType;
   startedAt: number;
 };
 
@@ -265,8 +267,26 @@ export class Komichi {
     );
   }
 
+  if (
+    info.query &&
+    [...info.query.entries()].length > 0
+  ) {
+    const formattedQuery = [
+      ...info.query.entries(),
+    ]
+      .map(
+        ([name, value]) =>
+          `${name}="${value}"`,
+      )
+      .join(", ");
+
+    console.log(
+      `Query: ${formattedQuery}`,
+    );
+  }
+
   console.log(
-    `Response: ${info.statusCode}`,
+    `Response: ${info.statusCode} ${info.responseType.toUpperCase()}`,
   );
 
   console.log(
@@ -276,27 +296,27 @@ export class Komichi {
   console.log("--------------------------------");
 }
 
-  listen(port: number): void {
-    const server = createServer(
-      async (
-        request: IncomingMessage,
-        response: ServerResponse,
-      ) => {
-        await this.handleRequest(
-          request,
-          response,
-        );
-      },
-    );
-
-    server.listen(port, () => {
-      console.log(
-        `Komichi is running on http://localhost:${port}`,
+listen(port: number): void {
+  const server = createServer(
+    async (
+      request: IncomingMessage,
+      response: ServerResponse,
+    ) => {
+      await this.handleRequest(
+        request,
+        response,
       );
-    });
-  }
+    },
+  );
 
-  private async handleRequest(
+  server.listen(port, () => {
+    console.log(
+      `Komichi is running on http://localhost:${port}`,
+    );
+  });
+}
+
+    private async handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
@@ -331,7 +351,9 @@ export class Komichi {
 
   if (!matchedRoute) {
     const allowedMethods =
-      this.findAllowedMethods(url.pathname);
+      this.findAllowedMethods(
+        url.pathname,
+      );
 
     if (allowedMethods.length > 0) {
       response.setHeader(
@@ -342,7 +364,9 @@ export class Komichi {
       this.printTrail({
         method,
         requestedPath: url.pathname,
+        query: url.searchParams,
         statusCode: 405,
+        responseType: "json",
         startedAt,
       });
 
@@ -365,7 +389,9 @@ export class Komichi {
     this.printTrail({
       method,
       requestedPath: url.pathname,
+      query: url.searchParams,
       statusCode: 404,
+      responseType: "json",
       startedAt,
     });
 
@@ -400,11 +426,12 @@ export class Komichi {
       ? await this.readJsonBody(request)
       : {};
 
-    const result = await matchedRoute.handler(
-      params,
-      url.searchParams,
-      body,
-    );
+    const result =
+      await matchedRoute.handler(
+        params,
+        url.searchParams,
+        body,
+      );
 
     if (result instanceof KomichiResponse) {
       this.printTrail({
@@ -412,7 +439,9 @@ export class Komichi {
         requestedPath: url.pathname,
         matchedPath: matchedRoute.path,
         params,
+        query: url.searchParams,
         statusCode: result.statusCode,
+        responseType: result.type,
         startedAt,
       });
 
@@ -451,7 +480,9 @@ export class Komichi {
         requestedPath: url.pathname,
         matchedPath: matchedRoute.path,
         params,
+        query: url.searchParams,
         statusCode: 200,
+        responseType: "text",
         startedAt,
       });
 
@@ -469,7 +500,9 @@ export class Komichi {
       requestedPath: url.pathname,
       matchedPath: matchedRoute.path,
       params,
+      query: url.searchParams,
       statusCode: 200,
+      responseType: "json",
       startedAt,
     });
 
@@ -487,7 +520,9 @@ export class Komichi {
         requestedPath: url.pathname,
         matchedPath: matchedRoute.path,
         params,
+        query: url.searchParams,
         statusCode: 400,
+        responseType: "json",
         startedAt,
       });
 
@@ -503,7 +538,9 @@ export class Komichi {
       requestedPath: url.pathname,
       matchedPath: matchedRoute.path,
       params,
+      query: url.searchParams,
       statusCode: 500,
+      responseType: "json",
       startedAt,
     });
 
@@ -512,6 +549,7 @@ export class Komichi {
     });
   }
 }
+  
 
   private matchPath(
     routePath: string,
