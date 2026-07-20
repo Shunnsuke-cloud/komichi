@@ -4,11 +4,18 @@ import {
   type ServerResponse,
 } from "node:http";
 
-type HandlerResult = Record<string, unknown> | string;
+class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BadRequestError";
+  }
+}
+
+type HandlerResult =
+  | Record<string, unknown>
+  | string;
 
 type Params = Record<string, string>;
-
-
 
 type JsonBody = Record<string, unknown>;
 
@@ -17,7 +24,6 @@ type Handler = (
   query: URLSearchParams,
   body: JsonBody,
 ) => HandlerResult | Promise<HandlerResult>;
-
 
 type Route = {
   method: string;
@@ -38,9 +44,9 @@ export class Komichi {
 
   post(path: string, handler: Handler): void {
     this.routes.push({
-    method: "POST",
-    path,
-    handler,
+      method: "POST",
+      path,
+      handler,
     });
   }
 
@@ -66,30 +72,31 @@ export class Komichi {
     response: ServerResponse,
   ): Promise<void> {
     const method = request.method ?? "GET";
+
     const url = new URL(
       request.url ?? "/",
       "http://localhost",
     );
 
     let matchedRoute: Route | undefined;
-let params: Params = {};
+    let params: Params = {};
 
-for (const registeredRoute of this.routes) {
-  if (registeredRoute.method !== method) {
-    continue;
-  }
+    for (const registeredRoute of this.routes) {
+      if (registeredRoute.method !== method) {
+        continue;
+      }
 
-    const matchedParams = this.matchPath(
-    registeredRoute.path,
-    url.pathname,
-  );
+      const matchedParams = this.matchPath(
+        registeredRoute.path,
+        url.pathname,
+      );
 
-  if (matchedParams !== null) {
-    matchedRoute = registeredRoute;
-    params = matchedParams;
-    break;
-  }
-}
+      if (matchedParams !== null) {
+        matchedRoute = registeredRoute;
+        params = matchedParams;
+        break;
+      }
+    }
 
     if (!matchedRoute) {
       this.sendJson(response, 404, {
@@ -101,15 +108,15 @@ for (const registeredRoute of this.routes) {
 
     try {
       const body =
-  method === "POST"
-    ? await this.readJsonBody(request)
-    : {};
+        method === "POST"
+          ? await this.readJsonBody(request)
+          : {};
 
-const result = await matchedRoute.handler(
-  params,
-  url.searchParams,
-  body,
-);
+      const result = await matchedRoute.handler(
+        params,
+        url.searchParams,
+        body,
+      );
 
       if (typeof result === "string") {
         this.sendText(response, 200, result);
@@ -120,6 +127,14 @@ const result = await matchedRoute.handler(
     } catch (error) {
       console.error(error);
 
+      if (error instanceof BadRequestError) {
+        this.sendJson(response, 400, {
+          message: error.message,
+        });
+
+        return;
+      }
+
       this.sendJson(response, 500, {
         message: "Internal Server Error",
       });
@@ -127,91 +142,115 @@ const result = await matchedRoute.handler(
   }
 
   private matchPath(
-  routePath: string,
-  requestPath: string,
-): Params | null {
-  const routeParts = routePath
-    .split("/")
-    .filter((part) => part.length > 0);
+    routePath: string,
+    requestPath: string,
+  ): Params | null {
+    const routeParts = routePath
+      .split("/")
+      .filter((part) => part.length > 0);
 
-  const requestParts = requestPath
-    .split("/")
-    .filter((part) => part.length > 0);
+    const requestParts = requestPath
+      .split("/")
+      .filter((part) => part.length > 0);
 
-  if (routeParts.length !== requestParts.length) {
-    return null;
-  }
+    if (routeParts.length !== requestParts.length) {
+      return null;
+    }
 
-  const params: Params = {};
+    const params: Params = {};
 
-  for (let index = 0; index < routeParts.length; index++) {
-    const routePart = routeParts[index];
-    const requestPart = requestParts[index];
-
-    if (
-      routePart === undefined ||
-      requestPart === undefined
+    for (
+      let index = 0;
+      index < routeParts.length;
+      index++
     ) {
-      return null;
-    }
+      const routePart = routeParts[index];
+      const requestPart = requestParts[index];
 
-    if (routePart.startsWith(":")) {
-      const paramName = routePart.slice(1);
-
-      params[paramName] = decodeURIComponent(requestPart);
-      continue;
-    }
-
-    if (routePart !== requestPart) {
-      return null;
-    }
-  }
-
-  return params;
-}
-
-    private readJsonBody(
-  request: IncomingMessage,
-): Promise<JsonBody> {
-  return new Promise((resolve, reject) => {
-    let body = "";
-
-    request.on("data", (chunk) => {
-      body += chunk.toString();
-    });
-
-    request.on("end", () => {
-      if (body.trim() === "") {
-        resolve({});
-        return;
+      if (
+        routePart === undefined ||
+        requestPart === undefined
+      ) {
+        return null;
       }
 
-      try {
-        const parsedBody = JSON.parse(body);
+      if (routePart.startsWith(":")) {
+        const paramName = routePart.slice(1);
 
-        if (
-          typeof parsedBody !== "object" ||
-          parsedBody === null ||
-          Array.isArray(parsedBody)
-        ) {
-          reject(
-            new Error(
-              "JSON body must be an object",
-            ),
-          );
+        if (paramName === "") {
+          return null;
+        }
 
+        try {
+          params[paramName] =
+            decodeURIComponent(requestPart);
+        } catch {
+          return null;
+        }
+
+        continue;
+      }
+
+      if (routePart !== requestPart) {
+        return null;
+      }
+    }
+
+    return params;
+  }
+
+  private readJsonBody(
+    request: IncomingMessage,
+  ): Promise<JsonBody> {
+    return new Promise((resolve, reject) => {
+      let body = "";
+
+      request.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      request.on("end", () => {
+        if (body.trim() === "") {
+          resolve({});
           return;
         }
 
-        resolve(parsedBody as JsonBody);
-      } catch {
-        reject(new Error("Invalid JSON"));
-      }
-    });
+        try {
+          const parsedBody: unknown =
+            JSON.parse(body);
 
-    request.on("error", reject);
-  });
-}
+          if (
+            typeof parsedBody !== "object" ||
+            parsedBody === null ||
+            Array.isArray(parsedBody)
+          ) {
+            reject(
+              new BadRequestError(
+                "JSONボディはオブジェクト形式で送信してください",
+              ),
+            );
+
+            return;
+          }
+
+          resolve(parsedBody as JsonBody);
+        } catch (error) {
+          if (error instanceof BadRequestError) {
+            reject(error);
+            return;
+          }
+
+          reject(
+            new BadRequestError(
+              "リクエストボディが正しいJSON形式ではありません",
+            ),
+          );
+        }
+      });
+
+      request.on("error", reject);
+    });
+  }
 
   private sendJson(
     response: ServerResponse,
