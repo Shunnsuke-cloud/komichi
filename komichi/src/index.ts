@@ -49,8 +49,27 @@ type Route = {
   description?: string;
 };
 
+type KomichiOptions = {
+  trail?: boolean;
+};
+
+type TrailInfo = {
+  method: string;
+  requestedPath: string;
+  matchedPath?: string;
+  params?: Params;
+  statusCode: number;
+  startedAt: number;
+};
+
 export class Komichi {
   private readonly routes: Route[] = [];
+
+  private readonly trailEnabled: boolean;
+
+  constructor(options: KomichiOptions = {}) {
+    this.trailEnabled = options.trail ?? false;
+  }
 
   get(
     path: string,
@@ -202,6 +221,61 @@ export class Komichi {
     console.log("");
   }
 
+  private printTrail(
+  info: TrailInfo,
+): void {
+  if (!this.trailEnabled) {
+    return;
+  }
+
+  const elapsedTime =
+    Date.now() - info.startedAt;
+
+  console.log("");
+  console.log("Komichi Trail");
+  console.log("--------------------------------");
+
+  console.log(
+    `${info.method} ${info.requestedPath}`,
+  );
+
+  if (info.matchedPath) {
+    console.log(
+      `Route: ${info.matchedPath}`,
+    );
+  } else {
+    console.log("Route: Not matched");
+  }
+
+  if (
+    info.params &&
+    Object.keys(info.params).length > 0
+  ) {
+    const formattedParams = Object.entries(
+      info.params,
+    )
+      .map(
+        ([name, value]) =>
+          `${name}="${value}"`,
+      )
+      .join(", ");
+
+    console.log(
+      `Params: ${formattedParams}`,
+    );
+  }
+
+  console.log(
+    `Response: ${info.statusCode}`,
+  );
+
+  console.log(
+    `Total: ${elapsedTime}ms`,
+  );
+
+  console.log("--------------------------------");
+}
+
   listen(port: number): void {
     const server = createServer(
       async (
@@ -223,166 +297,221 @@ export class Komichi {
   }
 
   private async handleRequest(
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
-    const method = request.method ?? "GET";
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const startedAt = Date.now();
 
-    const url = new URL(
-      request.url ?? "/",
-      "http://localhost",
-    );
+  const method = request.method ?? "GET";
 
-    let matchedRoute: Route | undefined;
-    let params: Params = {};
+  const url = new URL(
+    request.url ?? "/",
+    "http://localhost",
+  );
 
-    for (const registeredRoute of this.routes) {
-      if (registeredRoute.method !== method) {
-        continue;
-      }
+  let matchedRoute: Route | undefined;
+  let params: Params = {};
 
-      const matchedParams = this.matchPath(
-        registeredRoute.path,
-        url.pathname,
-      );
-
-      if (matchedParams !== null) {
-        matchedRoute = registeredRoute;
-        params = matchedParams;
-        break;
-      }
+  for (const registeredRoute of this.routes) {
+    if (registeredRoute.method !== method) {
+      continue;
     }
 
-    if (!matchedRoute) {
-      const allowedMethods =
-        this.findAllowedMethods(
-          url.pathname,
-        );
+    const matchedParams = this.matchPath(
+      registeredRoute.path,
+      url.pathname,
+    );
 
-      if (allowedMethods.length > 0) {
-        response.setHeader(
-          "Allow",
-          allowedMethods.join(", "),
-        );
+    if (matchedParams !== null) {
+      matchedRoute = registeredRoute;
+      params = matchedParams;
+      break;
+    }
+  }
 
-        this.sendJson(response, 405, {
-          message: "Method Not Allowed",
-          requestedMethod: method,
-          requestedPath: url.pathname,
-          allowedMethods,
-        });
+  if (!matchedRoute) {
+    const allowedMethods =
+      this.findAllowedMethods(url.pathname);
 
-        return;
-      }
+    if (allowedMethods.length > 0) {
+      response.setHeader(
+        "Allow",
+        allowedMethods.join(", "),
+      );
 
-      const suggestions =
-        this.findRouteSuggestions(
-          method,
-          url.pathname,
-        );
+      this.printTrail({
+        method,
+        requestedPath: url.pathname,
+        statusCode: 405,
+        startedAt,
+      });
 
-      this.sendJson(response, 404, {
-        message: "Route not found",
+      this.sendJson(response, 405, {
+        message: "Method Not Allowed",
         requestedMethod: method,
         requestedPath: url.pathname,
-        suggestions: suggestions.map(
-          (suggestion) => ({
-            method: suggestion.method,
-            path: suggestion.path,
-            similarity: Number(
-              suggestion.score.toFixed(2),
-            ),
-          }),
-        ),
+        allowedMethods,
       });
 
       return;
     }
 
-    try {
-      const methodsWithBody = [
-        "POST",
-        "PUT",
-        "PATCH",
-      ];
-
-      const body = methodsWithBody.includes(
+    const suggestions =
+      this.findRouteSuggestions(
         method,
-      )
-        ? await this.readJsonBody(request)
-        : {};
+        url.pathname,
+      );
 
-      const result =
-        await matchedRoute.handler(
-          params,
-          url.searchParams,
-          body,
-        );
+    this.printTrail({
+      method,
+      requestedPath: url.pathname,
+      statusCode: 404,
+      startedAt,
+    });
 
-        if (result instanceof KomichiResponse) {
-  if (result.type === "text") {
-    this.sendText(
-      response,
-      result.statusCode,
-      String(result.body),
-    );
-
-    return;
-  }
-
-  if (result.type === "html") {
-    this.sendHtml(
-      response,
-      result.statusCode,
-      String(result.body),
-    );
+    this.sendJson(response, 404, {
+      message: "Route not found",
+      requestedMethod: method,
+      requestedPath: url.pathname,
+      suggestions: suggestions.map(
+        (suggestion) => ({
+          method: suggestion.method,
+          path: suggestion.path,
+          similarity: Number(
+            suggestion.score.toFixed(2),
+          ),
+        }),
+      ),
+    });
 
     return;
   }
 
-  this.sendJson(
-    response,
-    result.statusCode,
-    result.body,
-  );
+  try {
+    const methodsWithBody = [
+      "POST",
+      "PUT",
+      "PATCH",
+    ];
 
-  return;
-}
+    const body = methodsWithBody.includes(
+      method,
+    )
+      ? await this.readJsonBody(request)
+      : {};
 
-      if (typeof result === "string") {
+    const result = await matchedRoute.handler(
+      params,
+      url.searchParams,
+      body,
+    );
+
+    if (result instanceof KomichiResponse) {
+      this.printTrail({
+        method,
+        requestedPath: url.pathname,
+        matchedPath: matchedRoute.path,
+        params,
+        statusCode: result.statusCode,
+        startedAt,
+      });
+
+      if (result.type === "text") {
         this.sendText(
           response,
-          200,
-          result,
+          result.statusCode,
+          String(result.body),
         );
 
         return;
-
-
       }
 
+      if (result.type === "html") {
+        this.sendHtml(
+          response,
+          result.statusCode,
+          String(result.body),
+        );
+
+        return;
+      }
 
       this.sendJson(
+        response,
+        result.statusCode,
+        result.body,
+      );
+
+      return;
+    }
+
+    if (typeof result === "string") {
+      this.printTrail({
+        method,
+        requestedPath: url.pathname,
+        matchedPath: matchedRoute.path,
+        params,
+        statusCode: 200,
+        startedAt,
+      });
+
+      this.sendText(
         response,
         200,
         result,
       );
-    } catch (error) {
-      console.error(error);
 
-      if (error instanceof BadRequestError) {
-        this.sendJson(response, 400, {
-          message: error.message,
-        });
-
-        return;
-      }
-
-      this.sendJson(response, 500, {
-        message: "Internal Server Error",
-      });
+      return;
     }
+
+    this.printTrail({
+      method,
+      requestedPath: url.pathname,
+      matchedPath: matchedRoute.path,
+      params,
+      statusCode: 200,
+      startedAt,
+    });
+
+    this.sendJson(
+      response,
+      200,
+      result,
+    );
+  } catch (error) {
+    console.error(error);
+
+    if (error instanceof BadRequestError) {
+      this.printTrail({
+        method,
+        requestedPath: url.pathname,
+        matchedPath: matchedRoute.path,
+        params,
+        statusCode: 400,
+        startedAt,
+      });
+
+      this.sendJson(response, 400, {
+        message: error.message,
+      });
+
+      return;
+    }
+
+    this.printTrail({
+      method,
+      requestedPath: url.pathname,
+      matchedPath: matchedRoute.path,
+      params,
+      statusCode: 500,
+      startedAt,
+    });
+
+    this.sendJson(response, 500, {
+      message: "Internal Server Error",
+    });
   }
+}
 
   private matchPath(
     routePath: string,

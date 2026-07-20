@@ -1,6 +1,8 @@
 import { Komichi } from "../src/index.js";
 
-const app = new Komichi();
+const app = new Komichi({
+  trail: true,
+});
 
 app.get(
   "/",
