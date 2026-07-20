@@ -98,6 +98,27 @@ app.delete(
   "ユーザーを削除",
 );
 
+app.get(
+  "/page",
+  () => {
+    return app.html(`
+      <!DOCTYPE html>
+      <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Komichi</title>
+        </head>
+        <body>
+          <h1>Komichi</h1>
+          <p>HTMLレスポンスに対応しました。</p>
+        </body>
+      </html>
+    `);
+  },
+  "HTMLページを表示",
+);
+
 app.printRoutes();
 
 app.listen(3000);

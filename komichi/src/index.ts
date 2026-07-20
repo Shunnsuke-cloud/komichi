@@ -11,7 +11,7 @@ class BadRequestError extends Error {
   }
 }
 
-type ResponseType = "json" | "text";
+type ResponseType = "json" | "text" | "html";
 
 class KomichiResponse {
   constructor(
@@ -138,6 +138,17 @@ export class Komichi {
       "text",
     );
   }
+
+  html(
+    data: string,
+    statusCode = 200,
+        ): KomichiResponse {
+        return new KomichiResponse(
+        data,
+        statusCode,
+        "html",
+        );
+    }
 
   printRoutes(): void {
     console.log("");
@@ -308,25 +319,35 @@ export class Komichi {
           body,
         );
 
-      if (result instanceof KomichiResponse) {
-        if (result.type === "text") {
-          this.sendText(
-            response,
-            result.statusCode,
-            String(result.body),
-          );
+        if (result instanceof KomichiResponse) {
+  if (result.type === "text") {
+    this.sendText(
+      response,
+      result.statusCode,
+      String(result.body),
+    );
 
-          return;
-        }
+    return;
+  }
 
-        this.sendJson(
-          response,
-          result.statusCode,
-          result.body,
-        );
+  if (result.type === "html") {
+    this.sendHtml(
+      response,
+      result.statusCode,
+      String(result.body),
+    );
 
-        return;
-      }
+    return;
+  }
+
+  this.sendJson(
+    response,
+    result.statusCode,
+    result.body,
+  );
+
+  return;
+}
 
       if (typeof result === "string") {
         this.sendText(
@@ -336,7 +357,10 @@ export class Komichi {
         );
 
         return;
+
+
       }
+
 
       this.sendJson(
         response,
@@ -754,5 +778,19 @@ export class Komichi {
     );
 
     response.end(data);
-  }
+    }
+    private sendHtml(
+        response: ServerResponse,
+        statusCode: number,
+        data: string,
+    ): void {
+    response.statusCode = statusCode;
+
+    response.setHeader(
+    "Content-Type",
+    "text/html; charset=utf-8",
+    );
+
+    response.end(data);
+    }
 }
