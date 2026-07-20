@@ -32,6 +32,14 @@ export class Komichi {
     });
   }
 
+  post(path: string, handler: Handler): void {
+    this.routes.push({
+    method: "POST",
+    path,
+    handler,
+    });
+  }
+
   listen(port: number): void {
     const server = createServer(
       async (

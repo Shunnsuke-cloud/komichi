@@ -31,4 +31,10 @@ app.get("/search", (_params, query) => {
   };
 });
 
+app.post("/users", () => {
+  return {
+    message: "POSTリクエストを受け取りました",
+  };
+});
+
 app.listen(3000);
