@@ -11,17 +11,26 @@ class BadRequestError extends Error {
   }
 }
 
+type ResponseType = "json" | "text";
+
+class KomichiResponse {
+  constructor(
+    public readonly body: unknown,
+    public readonly statusCode: number,
+    public readonly type: ResponseType,
+  ) {}
+}
+
 type RouteSuggestion = {
   method: string;
   path: string;
   score: number;
 };
 
-
-
 type HandlerResult =
   | Record<string, unknown>
-  | string;
+  | string
+  | KomichiResponse;
 
 type Params = Record<string, string>;
 
@@ -43,70 +52,144 @@ type Route = {
 export class Komichi {
   private readonly routes: Route[] = [];
 
-    get(
-        path: string,
-        handler: Handler,
-        description?: string,
-        ): void {
-        this.routes.push({
-        method: "GET",
-        path,
-        handler,
-        description,
-    });
-    }
-
-    post(
-        path: string,
-        handler: Handler,
-        description?: string,
-        ): void {
-        this.routes.push({
-        method: "POST",
-        path,
-        handler,
-        description,
-    });
-    }
-
-    put(
+  get(
     path: string,
     handler: Handler,
     description?: string,
-    ): void {
-        this.routes.push({
-        method: "PUT",
-        path,
-        handler,
-        description,
-    });
-    }
-
-    patch(
-    path: string,
-    handler: Handler,
-    description?: string,
-    ): void {
+  ): void {
     this.routes.push({
-        method: "PATCH",
-        path,
-        handler,
-        description,
+      method: "GET",
+      path,
+      handler,
+      description,
     });
-    }
+  }
 
-    delete(
+  post(
     path: string,
     handler: Handler,
     description?: string,
-    ): void {
+  ): void {
     this.routes.push({
-        method: "DELETE",
-        path,
-        handler,
-        description,
+      method: "POST",
+      path,
+      handler,
+      description,
     });
+  }
+
+  put(
+    path: string,
+    handler: Handler,
+    description?: string,
+  ): void {
+    this.routes.push({
+      method: "PUT",
+      path,
+      handler,
+      description,
+    });
+  }
+
+  patch(
+    path: string,
+    handler: Handler,
+    description?: string,
+  ): void {
+    this.routes.push({
+      method: "PATCH",
+      path,
+      handler,
+      description,
+    });
+  }
+
+  delete(
+    path: string,
+    handler: Handler,
+    description?: string,
+  ): void {
+    this.routes.push({
+      method: "DELETE",
+      path,
+      handler,
+      description,
+    });
+  }
+
+  json(
+    data: unknown,
+    statusCode = 200,
+  ): KomichiResponse {
+    return new KomichiResponse(
+      data,
+      statusCode,
+      "json",
+    );
+  }
+
+  text(
+    data: string,
+    statusCode = 200,
+  ): KomichiResponse {
+    return new KomichiResponse(
+      data,
+      statusCode,
+      "text",
+    );
+  }
+
+  printRoutes(): void {
+    console.log("");
+    console.log("Komichi Route Map");
+    console.log("------------------------------");
+
+    if (this.routes.length === 0) {
+      console.log("登録されているルートはありません");
+      console.log("");
+      return;
     }
+
+    const methodWidth = Math.max(
+      ...this.routes.map(
+        (route) => route.method.length,
+      ),
+      6,
+    );
+
+    const pathWidth = Math.max(
+      ...this.routes.map(
+        (route) => route.path.length,
+      ),
+      4,
+    );
+
+    for (const route of this.routes) {
+      const method = route.method.padEnd(
+        methodWidth,
+      );
+
+      const path = route.path.padEnd(
+        pathWidth,
+      );
+
+      const description = route.description
+        ? `  ${route.description}`
+        : "";
+
+      console.log(
+        `${method}  ${path}${description}`,
+      );
+    }
+
+    console.log("------------------------------");
+
+    console.log(
+      `${this.routes.length} routes registered`,
+    );
+
+    console.log("");
+  }
 
   listen(port: number): void {
     const server = createServer(
@@ -114,7 +197,10 @@ export class Komichi {
         request: IncomingMessage,
         response: ServerResponse,
       ) => {
-        await this.handleRequest(request, response);
+        await this.handleRequest(
+          request,
+          response,
+        );
       },
     );
 
@@ -124,49 +210,6 @@ export class Komichi {
       );
     });
   }
-
-  printRoutes(): void {
-    console.log("");
-    console.log("Komichi Route Map");
-    console.log("------------------------------");
-
-    if (this.routes.length === 0) {
-        console.log("登録されているルートはありません");
-        console.log("");
-    return;
-    }
-
-    let methodWidth = Math.max(
-    ...this.routes.map((route) => route.method.length),
-    6,
-    );
-
-    const pathWidth = Math.max(
-    ...this.routes.map((route) => route.path.length),
-    4,
-    );
-
-    for (const route of this.routes) {
-        const method = route.method.padEnd(methodWidth);
-        const path = route.path.padEnd(pathWidth);
-
-        const description = route.description
-        ? `  ${route.description}`
-        : "";
-
-        console.log(
-         `${method}  ${path}${description}`,
-        );
-    }
-
-    console.log("------------------------------");
-
-    console.log(
-    `${this.routes.length} routes registered`,
-    );
-
-    console.log("");
-    }
 
   private async handleRequest(
     request: IncomingMessage,
@@ -200,84 +243,120 @@ export class Komichi {
     }
 
     if (!matchedRoute) {
-        const allowedMethods = this.findAllowedMethods(
-        url.pathname,
-    );
+      const allowedMethods =
+        this.findAllowedMethods(
+          url.pathname,
+        );
 
-    if (allowedMethods.length > 0) {
+      if (allowedMethods.length > 0) {
         response.setHeader(
-        "Allow",
-        allowedMethods.join(", "),
-    );
+          "Allow",
+          allowedMethods.join(", "),
+        );
 
-    this.sendJson(response, 405, {
-      message: "Method Not Allowed",
-      requestedMethod: method,
-      requestedPath: url.pathname,
-      allowedMethods,
-    });
-
-    return;
-    }
-
-    const suggestions = this.findRouteSuggestions(
-  method,
-  url.pathname,
-);
-
-    this.sendJson(response, 404, {
-    message: "Route not found",
-    requestedMethod: method,
-    requestedPath: url.pathname,
-    suggestions: suggestions.map((suggestion) => ({
-    method: suggestion.method,
-    path: suggestion.path,
-    similarity: Number(
-        suggestion.score.toFixed(2),
-        ),
-    })),
-    });
-
-    return;
-    }
-
-    try {
-        const methodsWithBody = [
-        "POST",
-        "PUT",
-        "PATCH",
-    ];
-
-    const body = methodsWithBody.includes(method)
-    ? await this.readJsonBody(request)
-    : {};
-
-    const result = await matchedRoute.handler(
-        params,
-        url.searchParams,
-        body,
-    );
-
-    if (typeof result === "string") {
-        this.sendText(response, 200, result);
-        return;
-    }
-
-    this.sendJson(response, 200, result);
-    } catch (error) {
-    console.error(error);
-
-    if (error instanceof BadRequestError) {
-        this.sendJson(response, 400, {
-        message: error.message,
+        this.sendJson(response, 405, {
+          message: "Method Not Allowed",
+          requestedMethod: method,
+          requestedPath: url.pathname,
+          allowedMethods,
         });
 
         return;
+      }
+
+      const suggestions =
+        this.findRouteSuggestions(
+          method,
+          url.pathname,
+        );
+
+      this.sendJson(response, 404, {
+        message: "Route not found",
+        requestedMethod: method,
+        requestedPath: url.pathname,
+        suggestions: suggestions.map(
+          (suggestion) => ({
+            method: suggestion.method,
+            path: suggestion.path,
+            similarity: Number(
+              suggestion.score.toFixed(2),
+            ),
+          }),
+        ),
+      });
+
+      return;
     }
 
-    this.sendJson(response, 500, {
+    try {
+      const methodsWithBody = [
+        "POST",
+        "PUT",
+        "PATCH",
+      ];
+
+      const body = methodsWithBody.includes(
+        method,
+      )
+        ? await this.readJsonBody(request)
+        : {};
+
+      const result =
+        await matchedRoute.handler(
+          params,
+          url.searchParams,
+          body,
+        );
+
+      if (result instanceof KomichiResponse) {
+        if (result.type === "text") {
+          this.sendText(
+            response,
+            result.statusCode,
+            String(result.body),
+          );
+
+          return;
+        }
+
+        this.sendJson(
+          response,
+          result.statusCode,
+          result.body,
+        );
+
+        return;
+      }
+
+      if (typeof result === "string") {
+        this.sendText(
+          response,
+          200,
+          result,
+        );
+
+        return;
+      }
+
+      this.sendJson(
+        response,
+        200,
+        result,
+      );
+    } catch (error) {
+      console.error(error);
+
+      if (error instanceof BadRequestError) {
+        this.sendJson(response, 400, {
+          message: error.message,
+        });
+
+        return;
+      }
+
+      this.sendJson(response, 500, {
         message: "Internal Server Error",
-    });
+      });
     }
   }
 
@@ -287,13 +366,20 @@ export class Komichi {
   ): Params | null {
     const routeParts = routePath
       .split("/")
-      .filter((part) => part.length > 0);
+      .filter(
+        (part) => part.length > 0,
+      );
 
     const requestParts = requestPath
       .split("/")
-      .filter((part) => part.length > 0);
+      .filter(
+        (part) => part.length > 0,
+      );
 
-    if (routeParts.length !== requestParts.length) {
+    if (
+      routeParts.length !==
+      requestParts.length
+    ) {
       return null;
     }
 
@@ -304,8 +390,11 @@ export class Komichi {
       index < routeParts.length;
       index++
     ) {
-      const routePart = routeParts[index];
-      const requestPart = requestParts[index];
+      const routePart =
+        routeParts[index];
+
+      const requestPart =
+        requestParts[index];
 
       if (
         routePart === undefined ||
@@ -315,7 +404,8 @@ export class Komichi {
       }
 
       if (routePart.startsWith(":")) {
-        const paramName = routePart.slice(1);
+        const paramName =
+          routePart.slice(1);
 
         if (paramName === "") {
           return null;
@@ -323,7 +413,9 @@ export class Komichi {
 
         try {
           params[paramName] =
-            decodeURIComponent(requestPart);
+            decodeURIComponent(
+              requestPart,
+            );
         } catch {
           return null;
         }
@@ -339,215 +431,297 @@ export class Komichi {
     return params;
   }
 
-    private findAllowedMethods(
-        requestPath: string,
-        ): string[] {
-        const allowedMethods: string[] = [];
+  private findAllowedMethods(
+    requestPath: string,
+  ): string[] {
+    const allowedMethods: string[] = [];
 
-         for (const registeredRoute of this.routes) {
-            const matchedParams = this.matchPath(
-            registeredRoute.path,
-            requestPath,
-            );
+    for (const registeredRoute of this.routes) {
+      const matchedParams =
+        this.matchPath(
+          registeredRoute.path,
+          requestPath,
+        );
 
-        if (matchedParams !== null) {
-        allowedMethods.push(registeredRoute.method);
-        }
-        }
-
-        return allowedMethods;
+      if (matchedParams !== null) {
+        allowedMethods.push(
+          registeredRoute.method,
+        );
+      }
     }
 
-    private calculateDistance(
+    return [...new Set(allowedMethods)];
+  }
+
+  private calculateDistance(
     left: string,
     right: string,
-    ): number {
+  ): number {
     const rows = left.length + 1;
     const columns = right.length + 1;
 
-    const matrix: number[][] = Array.from(
-    { length: rows },
-    () => Array<number>(columns).fill(0),
-    );
+    const matrix: number[][] =
+      Array.from(
+        { length: rows },
+        () =>
+          Array<number>(
+            columns,
+          ).fill(0),
+      );
 
-    for (let row = 0; row < rows; row++) {
-        matrix[row]![0] = row;
+    for (
+      let row = 0;
+      row < rows;
+      row++
+    ) {
+      matrix[row]![0] = row;
     }
 
-    for (let column = 0; column < columns; column++) {
-        matrix[0]![column] = column;
+    for (
+      let column = 0;
+      column < columns;
+      column++
+    ) {
+      matrix[0]![column] = column;
     }
 
-    for (let row = 1; row < rows; row++) {
-        for (let column = 1; column < columns; column++) {
-            const cost =
-            left[row - 1] === right[column - 1]
+    for (
+      let row = 1;
+      row < rows;
+      row++
+    ) {
+      for (
+        let column = 1;
+        column < columns;
+        column++
+      ) {
+        const cost =
+          left[row - 1] ===
+          right[column - 1]
             ? 0
             : 1;
 
-        matrix[row]![column] = Math.min(
-        matrix[row - 1]![column]! + 1,
-        matrix[row]![column - 1]! + 1,
-        matrix[row - 1]![column - 1]! + cost,
-        );
-    }
+        matrix[row]![column] =
+          Math.min(
+            matrix[row - 1]![
+              column
+            ]! + 1,
+
+            matrix[row]![
+              column - 1
+            ]! + 1,
+
+            matrix[row - 1]![
+              column - 1
+            ]! + cost,
+          );
+      }
     }
 
-    return matrix[left.length]![right.length]!;
-    }
+    return matrix[left.length]![
+      right.length
+    ]!;
+  }
 
-    private calculateSimilarity(
+  private calculateSimilarity(
     requestedPath: string,
     registeredPath: string,
-    ): number {
-    const requestedParts = requestedPath
-    .split("/")
-    .filter((part) => part.length > 0);
+  ): number {
+    const requestedParts =
+      requestedPath
+        .split("/")
+        .filter(
+          (part) => part.length > 0,
+        );
 
-    const registeredParts = registeredPath
-    .split("/")
-    .filter((part) => part.length > 0);
+    const registeredParts =
+      registeredPath
+        .split("/")
+        .filter(
+          (part) => part.length > 0,
+        );
 
     const maximumLength = Math.max(
-    requestedParts.length,
-    registeredParts.length,
+      requestedParts.length,
+      registeredParts.length,
     );
 
     if (maximumLength === 0) {
-    return 1;
+      return 1;
     }
 
     let totalScore = 0;
 
     for (
-    let index = 0;
-    index < maximumLength;
-    index++
+      let index = 0;
+      index < maximumLength;
+      index++
     ) {
-        const requestedPart = requestedParts[index];
-        const registeredPart = registeredParts[index];
+      const requestedPart =
+        requestedParts[index];
 
-    if (
-      requestedPart === undefined ||
-      registeredPart === undefined
-    ) {
-      continue;
-    }
+      const registeredPart =
+        registeredParts[index];
 
-    if (registeredPart.startsWith(":")) {
-      totalScore += 1;
-      continue;
-    }
+      if (
+        requestedPart === undefined ||
+        registeredPart === undefined
+      ) {
+        continue;
+      }
 
-        const distance = this.calculateDistance(
-        requestedPart.toLowerCase(),
-        registeredPart.toLowerCase(),
-    );
+      if (
+        registeredPart.startsWith(":")
+      ) {
+        totalScore += 1;
+        continue;
+      }
 
-    const longestLength = Math.max(
-      requestedPart.length,
-      registeredPart.length,
-    );
+      const distance =
+        this.calculateDistance(
+          requestedPart.toLowerCase(),
+          registeredPart.toLowerCase(),
+        );
 
-    if (longestLength === 0) {
-      totalScore += 1;
-      continue;
-    }
+      const longestLength = Math.max(
+        requestedPart.length,
+        registeredPart.length,
+      );
 
-    totalScore +=
-      1 - distance / longestLength;
+      if (longestLength === 0) {
+        totalScore += 1;
+        continue;
+      }
+
+      totalScore +=
+        1 -
+        distance / longestLength;
     }
 
     return totalScore / maximumLength;
-    }
+  }
 
-    private findRouteSuggestions(
+  private findRouteSuggestions(
     method: string,
     requestPath: string,
-    ): RouteSuggestion[] {
-    return this.routes
-    .map((route) => {
-        const score = this.calculateSimilarity(
-        requestPath,
-        route.path,
+  ): RouteSuggestion[] {
+    const uniqueSuggestions =
+      new Map<string, RouteSuggestion>();
+
+    for (const route of this.routes) {
+      const score =
+        this.calculateSimilarity(
+          requestPath,
+          route.path,
         );
 
-        return {
+      const key =
+        `${route.method}:${route.path}`;
+
+      uniqueSuggestions.set(key, {
         method: route.method,
         path: route.path,
         score,
-        };
-        })
-        .filter((suggestion) => {
-        return suggestion.score >= 0.45;
-        })
-        .sort((left, right) => {
+      });
+    }
+
+    return [
+      ...uniqueSuggestions.values(),
+    ]
+      .filter(
+        (suggestion) =>
+          suggestion.score >= 0.45,
+      )
+      .sort((left, right) => {
         const leftMethodMatch =
-        left.method === method ? 1 : 0;
+          left.method === method ? 1 : 0;
 
         const rightMethodMatch =
-        right.method === method ? 1 : 0;
+          right.method === method ? 1 : 0;
 
-        if (leftMethodMatch !== rightMethodMatch) {
-        return rightMethodMatch - leftMethodMatch;
+        if (
+          leftMethodMatch !==
+          rightMethodMatch
+        ) {
+          return (
+            rightMethodMatch -
+            leftMethodMatch
+          );
         }
 
-        return right.score - left.score;
-        })
-        .slice(0, 3);
-    }
+        return (
+          right.score -
+          left.score
+        );
+      })
+      .slice(0, 3);
+  }
 
   private readJsonBody(
     request: IncomingMessage,
   ): Promise<JsonBody> {
-    return new Promise((resolve, reject) => {
-      let body = "";
+    return new Promise(
+      (resolve, reject) => {
+        let body = "";
 
-      request.on("data", (chunk) => {
-        body += chunk.toString();
-      });
+        request.on(
+          "data",
+          (chunk) => {
+            body += chunk.toString();
+          },
+        );
 
-      request.on("end", () => {
-        if (body.trim() === "") {
-          resolve({});
-          return;
-        }
+        request.on("end", () => {
+          if (body.trim() === "") {
+            resolve({});
+            return;
+          }
 
-        try {
-          const parsedBody: unknown =
-            JSON.parse(body);
+          try {
+            const parsedBody: unknown =
+              JSON.parse(body);
 
-          if (
-            typeof parsedBody !== "object" ||
-            parsedBody === null ||
-            Array.isArray(parsedBody)
-          ) {
+            if (
+              typeof parsedBody !==
+                "object" ||
+              parsedBody === null ||
+              Array.isArray(parsedBody)
+            ) {
+              reject(
+                new BadRequestError(
+                  "JSONボディはオブジェクト形式で送信してください",
+                ),
+              );
+
+              return;
+            }
+
+            resolve(
+              parsedBody as JsonBody,
+            );
+          } catch (error) {
+            if (
+              error instanceof
+              BadRequestError
+            ) {
+              reject(error);
+              return;
+            }
+
             reject(
               new BadRequestError(
-                "JSONボディはオブジェクト形式で送信してください",
+                "リクエストボディが正しいJSON形式ではありません",
               ),
             );
-
-            return;
           }
+        });
 
-          resolve(parsedBody as JsonBody);
-        } catch (error) {
-          if (error instanceof BadRequestError) {
-            reject(error);
-            return;
-          }
-
-          reject(
-            new BadRequestError(
-              "リクエストボディが正しいJSON形式ではありません",
-            ),
-          );
-        }
-      });
-
-      request.on("error", reject);
-    });
+        request.on(
+          "error",
+          reject,
+        );
+      },
+    );
   }
 
   private sendJson(
@@ -562,7 +736,9 @@ export class Komichi {
       "application/json; charset=utf-8",
     );
 
-    response.end(JSON.stringify(data));
+    response.end(
+      JSON.stringify(data),
+    );
   }
 
   private sendText(

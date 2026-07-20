@@ -35,11 +35,14 @@ app.get(
 app.post(
   "/users",
   (_params, _query, body) => {
-    return {
-      message: "ユーザー情報を受け取りました",
-      name: body.name,
-      email: body.email,
-    };
+    return app.json(
+      {
+        message: "ユーザー情報を受け取りました",
+        name: body.name,
+        email: body.email,
+      },
+      201,
+    );
   },
   "ユーザーを登録",
 );
