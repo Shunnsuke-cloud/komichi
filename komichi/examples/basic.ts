@@ -20,4 +20,15 @@ app.get("/users/:id", (params) => {
   };
 });
 
+app.get("/search", (_params, query) => {
+  const keyword = query.get("keyword");
+  const page = query.get("page");
+
+  return {
+    message: "検索条件を取得しました",
+    keyword,
+    page,
+  };
+});
+
 app.listen(3000);

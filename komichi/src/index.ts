@@ -11,6 +11,7 @@ type Params = Record<string, string>;
 
 type Handler = (
   params: Params,
+  query: URLSearchParams,
 ) => HandlerResult | Promise<HandlerResult>;
 
 
@@ -87,7 +88,7 @@ for (const registeredRoute of this.routes) {
     }
 
     try {
-      const result = await matchedRoute.handler(params);
+      const result = await matchedRoute.handler(params, url.searchParams);
 
       if (typeof result === "string") {
         this.sendText(response, 200, result);
