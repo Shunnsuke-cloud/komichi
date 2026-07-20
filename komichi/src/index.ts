@@ -99,11 +99,33 @@ export class Komichi {
     }
 
     if (!matchedRoute) {
-      this.sendJson(response, 404, {
-        message: "Route not found",
-      });
+        const allowedMethods = this.findAllowedMethods(
+        url.pathname,
+    );
 
-      return;
+    if (allowedMethods.length > 0) {
+        response.setHeader(
+        "Allow",
+        allowedMethods.join(", "),
+    );
+
+    this.sendJson(response, 405, {
+      message: "Method Not Allowed",
+      requestedMethod: method,
+      requestedPath: url.pathname,
+      allowedMethods,
+    });
+
+    return;
+    }
+
+    this.sendJson(response, 404, {
+    message: "Route not found",
+    requestedMethod: method,
+    requestedPath: url.pathname,
+    });
+
+    return;
     }
 
     try {
@@ -198,6 +220,25 @@ export class Komichi {
 
     return params;
   }
+
+    private findAllowedMethods(
+        requestPath: string,
+        ): string[] {
+        const allowedMethods: string[] = [];
+
+         for (const registeredRoute of this.routes) {
+            const matchedParams = this.matchPath(
+            registeredRoute.path,
+            requestPath,
+            );
+
+        if (matchedParams !== null) {
+        allowedMethods.push(registeredRoute.method);
+        }
+        }
+
+        return allowedMethods;
+    }
 
   private readJsonBody(
     request: IncomingMessage,
