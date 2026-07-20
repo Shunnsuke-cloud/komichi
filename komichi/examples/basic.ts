@@ -13,10 +13,11 @@ app.get("/hello", () => {
   return "こんにちは、Komichiです";
 });
 
-app.get("/users/:id", (params) => {
+app.post("/users", (_params, _query, body) => {
   return {
-    message: "ユーザー情報を取得しました",
-    userId: params.id,
+    message: "ユーザー情報を受け取りました",
+    name: body.name,
+    email: body.email,
   };
 });
 

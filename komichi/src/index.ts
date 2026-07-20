@@ -6,12 +6,16 @@ import {
 
 type HandlerResult = Record<string, unknown> | string;
 
-
 type Params = Record<string, string>;
+
+
+
+type JsonBody = Record<string, unknown>;
 
 type Handler = (
   params: Params,
   query: URLSearchParams,
+  body: JsonBody,
 ) => HandlerResult | Promise<HandlerResult>;
 
 
@@ -96,7 +100,16 @@ for (const registeredRoute of this.routes) {
     }
 
     try {
-      const result = await matchedRoute.handler(params, url.searchParams);
+      const body =
+  method === "POST"
+    ? await this.readJsonBody(request)
+    : {};
+
+const result = await matchedRoute.handler(
+  params,
+  url.searchParams,
+  body,
+);
 
       if (typeof result === "string") {
         this.sendText(response, 200, result);
@@ -155,6 +168,49 @@ for (const registeredRoute of this.routes) {
   }
 
   return params;
+}
+
+    private readJsonBody(
+  request: IncomingMessage,
+): Promise<JsonBody> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    request.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    request.on("end", () => {
+      if (body.trim() === "") {
+        resolve({});
+        return;
+      }
+
+      try {
+        const parsedBody = JSON.parse(body);
+
+        if (
+          typeof parsedBody !== "object" ||
+          parsedBody === null ||
+          Array.isArray(parsedBody)
+        ) {
+          reject(
+            new Error(
+              "JSON body must be an object",
+            ),
+          );
+
+          return;
+        }
+
+        resolve(parsedBody as JsonBody);
+      } catch {
+        reject(new Error("Invalid JSON"));
+      }
+    });
+
+    request.on("error", reject);
+  });
 }
 
   private sendJson(
