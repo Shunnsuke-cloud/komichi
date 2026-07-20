@@ -59,6 +59,42 @@ app.get(
   "検索条件を取得",
 );
 
+app.put(
+  "/users/:id",
+  (params, _query, body) => {
+    return {
+      message: "ユーザー情報を更新しました",
+      userId: params.id,
+      name: body.name,
+      email: body.email,
+    };
+  },
+  "ユーザー情報を更新",
+);
+
+app.patch(
+  "/users/:id",
+  (params, _query, body) => {
+    return {
+      message: "ユーザー情報を一部更新しました",
+      userId: params.id,
+      updatedData: body,
+    };
+  },
+  "ユーザー情報を一部更新",
+);
+
+app.delete(
+  "/users/:id",
+  (params) => {
+    return {
+      message: "ユーザーを削除しました",
+      userId: params.id,
+    };
+  },
+  "ユーザーを削除",
+);
+
 app.printRoutes();
 
 app.listen(3000);

@@ -69,6 +69,45 @@ export class Komichi {
     });
     }
 
+    put(
+    path: string,
+    handler: Handler,
+    description?: string,
+    ): void {
+        this.routes.push({
+        method: "PUT",
+        path,
+        handler,
+        description,
+    });
+    }
+
+    patch(
+    path: string,
+    handler: Handler,
+    description?: string,
+    ): void {
+    this.routes.push({
+        method: "PATCH",
+        path,
+        handler,
+        description,
+    });
+    }
+
+    delete(
+    path: string,
+    handler: Handler,
+    description?: string,
+    ): void {
+    this.routes.push({
+        method: "DELETE",
+        path,
+        handler,
+        description,
+    });
+    }
+
   listen(port: number): void {
     const server = createServer(
       async (
@@ -203,37 +242,42 @@ export class Komichi {
     }
 
     try {
-      const body =
-        method === "POST"
-          ? await this.readJsonBody(request)
-          : {};
+        const methodsWithBody = [
+        "POST",
+        "PUT",
+        "PATCH",
+    ];
 
-      const result = await matchedRoute.handler(
+    const body = methodsWithBody.includes(method)
+    ? await this.readJsonBody(request)
+    : {};
+
+    const result = await matchedRoute.handler(
         params,
         url.searchParams,
         body,
-      );
+    );
 
-      if (typeof result === "string") {
+    if (typeof result === "string") {
         this.sendText(response, 200, result);
         return;
-      }
+    }
 
-      this.sendJson(response, 200, result);
+    this.sendJson(response, 200, result);
     } catch (error) {
-      console.error(error);
+    console.error(error);
 
-      if (error instanceof BadRequestError) {
+    if (error instanceof BadRequestError) {
         this.sendJson(response, 400, {
-          message: error.message,
+        message: error.message,
         });
 
         return;
-      }
+    }
 
-      this.sendJson(response, 500, {
+    this.sendJson(response, 500, {
         message: "Internal Server Error",
-      });
+    });
     }
   }
 
