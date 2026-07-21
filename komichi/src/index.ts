@@ -957,3 +957,8 @@ listen(port: number): void {
     response.end(data);
     }
 }
+
+export {
+  KomichiResponse,
+  type ResponseType,
+} from "./response.js";
