@@ -4,6 +4,11 @@ import {
   type ServerResponse,
 } from "node:http";
 
+import {
+  KomichiResponse,
+  type ResponseType,
+} from "./response.js";
+
 class BadRequestError extends Error {
   constructor(message: string) {
     super(message);
@@ -11,15 +16,6 @@ class BadRequestError extends Error {
   }
 }
 
-type ResponseType = "json" | "text" | "html";
-
-class KomichiResponse {
-  constructor(
-    public readonly body: unknown,
-    public readonly statusCode: number,
-    public readonly type: ResponseType,
-  ) {}
-}
 
 type RouteSuggestion = {
   method: string;
