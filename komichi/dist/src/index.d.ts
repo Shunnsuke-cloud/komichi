@@ -33,3 +33,4 @@ export declare class Komichi {
     private sendHtml;
 }
 export { KomichiResponse, type ResponseType, } from "./response.js";
+export { BadRequestError } from "./errors.js";

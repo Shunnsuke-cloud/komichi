@@ -9,12 +9,9 @@ import {
   type ResponseType,
 } from "./response.js";
 
-class BadRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BadRequestError";
-  }
-}
+import { BadRequestError } from "./errors.js";
+
+
 
 
 type RouteSuggestion = {
@@ -962,3 +959,5 @@ export {
   KomichiResponse,
   type ResponseType,
 } from "./response.js";
+
+export { BadRequestError } from "./errors.js";

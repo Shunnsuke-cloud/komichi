@@ -1,14 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.KomichiResponse = exports.Komichi = void 0;
+exports.BadRequestError = exports.KomichiResponse = exports.Komichi = void 0;
 const node_http_1 = require("node:http");
 const response_js_1 = require("./response.js");
-class BadRequestError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = "BadRequestError";
-    }
-}
+const errors_js_1 = require("./errors.js");
 class Komichi {
     routes = [];
     trailEnabled;
@@ -248,7 +243,7 @@ class Komichi {
         }
         catch (error) {
             console.error(error);
-            if (error instanceof BadRequestError) {
+            if (error instanceof errors_js_1.BadRequestError) {
                 this.printTrail({
                     method,
                     requestedPath: url.pathname,
@@ -430,18 +425,18 @@ class Komichi {
                         "object" ||
                         parsedBody === null ||
                         Array.isArray(parsedBody)) {
-                        reject(new BadRequestError("JSONボディはオブジェクト形式で送信してください"));
+                        reject(new errors_js_1.BadRequestError("JSONボディはオブジェクト形式で送信してください"));
                         return;
                     }
                     resolve(parsedBody);
                 }
                 catch (error) {
                     if (error instanceof
-                        BadRequestError) {
+                        errors_js_1.BadRequestError) {
                         reject(error);
                         return;
                     }
-                    reject(new BadRequestError("リクエストボディが正しいJSON形式ではありません"));
+                    reject(new errors_js_1.BadRequestError("リクエストボディが正しいJSON形式ではありません"));
                 }
             });
             request.on("error", reject);
@@ -466,3 +461,5 @@ class Komichi {
 exports.Komichi = Komichi;
 var response_js_2 = require("./response.js");
 Object.defineProperty(exports, "KomichiResponse", { enumerable: true, get: function () { return response_js_2.KomichiResponse; } });
+var errors_js_2 = require("./errors.js");
+Object.defineProperty(exports, "BadRequestError", { enumerable: true, get: function () { return errors_js_2.BadRequestError; } });
