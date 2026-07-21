@@ -1,13 +1,13 @@
 import { KomichiResponse } from "./response.js";
-type HandlerResult = Record<string, unknown> | string | KomichiResponse;
-type Params = Record<string, string>;
-type JsonBody = Record<string, unknown>;
-type Handler = (params: Params, query: URLSearchParams, body: JsonBody) => HandlerResult | Promise<HandlerResult>;
-type KomichiOptions = {
+import { type Params } from "./router.js";
+export type JsonBody = Record<string, unknown>;
+export type HandlerResult = Record<string, unknown> | string | KomichiResponse;
+export type Handler = (params: Params, query: URLSearchParams, body: JsonBody) => HandlerResult | Promise<HandlerResult>;
+export type KomichiOptions = {
     trail?: boolean;
 };
 export declare class Komichi {
-    private readonly routes;
+    private readonly router;
     private readonly trailEnabled;
     constructor(options?: KomichiOptions);
     get(path: string, handler: Handler, description?: string): void;
@@ -19,18 +19,14 @@ export declare class Komichi {
     text(data: string, statusCode?: number): KomichiResponse;
     html(data: string, statusCode?: number): KomichiResponse;
     printRoutes(): void;
-    private printTrail;
     listen(port: number): void;
     private handleRequest;
-    private matchPath;
-    private findAllowedMethods;
-    private calculateDistance;
-    private calculateSimilarity;
-    private findRouteSuggestions;
+    private printTrail;
     private readJsonBody;
     private sendJson;
     private sendText;
     private sendHtml;
 }
 export { KomichiResponse, type ResponseType, } from "./response.js";
-export { BadRequestError } from "./errors.js";
+export { BadRequestError, } from "./errors.js";
+export { Router, type Params, type Route, type RouteSuggestion, } from "./router.js";

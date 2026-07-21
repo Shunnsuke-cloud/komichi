@@ -1,54 +1,31 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BadRequestError = exports.KomichiResponse = exports.Komichi = void 0;
+exports.Router = exports.BadRequestError = exports.KomichiResponse = exports.Komichi = void 0;
 const node_http_1 = require("node:http");
-const response_js_1 = require("./response.js");
 const errors_js_1 = require("./errors.js");
+const response_js_1 = require("./response.js");
+const router_js_1 = require("./router.js");
 class Komichi {
-    routes = [];
+    router = new router_js_1.Router();
     trailEnabled;
     constructor(options = {}) {
-        this.trailEnabled = options.trail ?? false;
+        this.trailEnabled =
+            options.trail ?? false;
     }
     get(path, handler, description) {
-        this.routes.push({
-            method: "GET",
-            path,
-            handler,
-            description,
-        });
+        this.router.add("GET", path, handler, description);
     }
     post(path, handler, description) {
-        this.routes.push({
-            method: "POST",
-            path,
-            handler,
-            description,
-        });
+        this.router.add("POST", path, handler, description);
     }
     put(path, handler, description) {
-        this.routes.push({
-            method: "PUT",
-            path,
-            handler,
-            description,
-        });
+        this.router.add("PUT", path, handler, description);
     }
     patch(path, handler, description) {
-        this.routes.push({
-            method: "PATCH",
-            path,
-            handler,
-            description,
-        });
+        this.router.add("PATCH", path, handler, description);
     }
     delete(path, handler, description) {
-        this.routes.push({
-            method: "DELETE",
-            path,
-            handler,
-            description,
-        });
+        this.router.add("DELETE", path, handler, description);
     }
     json(data, statusCode = 200) {
         return new response_js_1.KomichiResponse(data, statusCode, "json");
@@ -60,17 +37,18 @@ class Komichi {
         return new response_js_1.KomichiResponse(data, statusCode, "html");
     }
     printRoutes() {
+        const routes = this.router.list();
         console.log("");
         console.log("Komichi Route Map");
         console.log("------------------------------");
-        if (this.routes.length === 0) {
+        if (routes.length === 0) {
             console.log("登録されているルートはありません");
             console.log("");
             return;
         }
-        const methodWidth = Math.max(...this.routes.map((route) => route.method.length), 6);
-        const pathWidth = Math.max(...this.routes.map((route) => route.path.length), 4);
-        for (const route of this.routes) {
+        const methodWidth = Math.max(...routes.map((route) => route.method.length), 6);
+        const pathWidth = Math.max(...routes.map((route) => route.path.length), 4);
+        for (const route of routes) {
             const method = route.method.padEnd(methodWidth);
             const path = route.path.padEnd(pathWidth);
             const description = route.description
@@ -79,43 +57,8 @@ class Komichi {
             console.log(`${method}  ${path}${description}`);
         }
         console.log("------------------------------");
-        console.log(`${this.routes.length} routes registered`);
+        console.log(`${routes.length} routes registered`);
         console.log("");
-    }
-    printTrail(info) {
-        if (!this.trailEnabled) {
-            return;
-        }
-        const elapsedTime = Date.now() - info.startedAt;
-        console.log("");
-        console.log("Komichi Trail");
-        console.log("--------------------------------");
-        console.log(`${info.method} ${info.requestedPath}`);
-        if (info.matchedPath) {
-            console.log(`Route: ${info.matchedPath}`);
-        }
-        else {
-            console.log("Route: Not matched");
-        }
-        if (info.params &&
-            Object.keys(info.params).length > 0) {
-            const formattedParams = Object.entries(info.params)
-                .map(([name, value]) => `${name}="${value}"`)
-                .join(", ");
-            console.log(`Params: ${formattedParams}`);
-        }
-        if (info.query &&
-            [...info.query.entries()].length > 0) {
-            const formattedQuery = [
-                ...info.query.entries(),
-            ]
-                .map(([name, value]) => `${name}="${value}"`)
-                .join(", ");
-            console.log(`Query: ${formattedQuery}`);
-        }
-        console.log(`Response: ${info.statusCode} ${info.responseType.toUpperCase()}`);
-        console.log(`Total: ${elapsedTime}ms`);
-        console.log("--------------------------------");
     }
     listen(port) {
         const server = (0, node_http_1.createServer)(async (request, response) => {
@@ -129,21 +72,11 @@ class Komichi {
         const startedAt = Date.now();
         const method = request.method ?? "GET";
         const url = new URL(request.url ?? "/", "http://localhost");
-        let matchedRoute;
-        let params = {};
-        for (const registeredRoute of this.routes) {
-            if (registeredRoute.method !== method) {
-                continue;
-            }
-            const matchedParams = this.matchPath(registeredRoute.path, url.pathname);
-            if (matchedParams !== null) {
-                matchedRoute = registeredRoute;
-                params = matchedParams;
-                break;
-            }
-        }
+        const matched = this.router.find(method, url.pathname);
+        const matchedRoute = matched?.route;
+        const params = matched?.params ?? {};
         if (!matchedRoute) {
-            const allowedMethods = this.findAllowedMethods(url.pathname);
+            const allowedMethods = this.router.findAllowedMethods(url.pathname);
             if (allowedMethods.length > 0) {
                 response.setHeader("Allow", allowedMethods.join(", "));
                 this.printTrail({
@@ -162,7 +95,7 @@ class Komichi {
                 });
                 return;
             }
-            const suggestions = this.findRouteSuggestions(method, url.pathname);
+            const suggestions = this.router.findSuggestions(method, url.pathname);
             this.printTrail({
                 method,
                 requestedPath: url.pathname,
@@ -193,7 +126,8 @@ class Komichi {
                 ? await this.readJsonBody(request)
                 : {};
             const result = await matchedRoute.handler(params, url.searchParams, body);
-            if (result instanceof response_js_1.KomichiResponse) {
+            if (result instanceof
+                response_js_1.KomichiResponse) {
                 this.printTrail({
                     method,
                     requestedPath: url.pathname,
@@ -243,7 +177,8 @@ class Komichi {
         }
         catch (error) {
             console.error(error);
-            if (error instanceof errors_js_1.BadRequestError) {
+            if (error instanceof
+                errors_js_1.BadRequestError) {
                 this.printTrail({
                     method,
                     requestedPath: url.pathname,
@@ -274,139 +209,42 @@ class Komichi {
             });
         }
     }
-    matchPath(routePath, requestPath) {
-        const routeParts = routePath
-            .split("/")
-            .filter((part) => part.length > 0);
-        const requestParts = requestPath
-            .split("/")
-            .filter((part) => part.length > 0);
-        if (routeParts.length !==
-            requestParts.length) {
-            return null;
+    printTrail(info) {
+        if (!this.trailEnabled) {
+            return;
         }
-        const params = {};
-        for (let index = 0; index < routeParts.length; index++) {
-            const routePart = routeParts[index];
-            const requestPart = requestParts[index];
-            if (routePart === undefined ||
-                requestPart === undefined) {
-                return null;
-            }
-            if (routePart.startsWith(":")) {
-                const paramName = routePart.slice(1);
-                if (paramName === "") {
-                    return null;
-                }
-                try {
-                    params[paramName] =
-                        decodeURIComponent(requestPart);
-                }
-                catch {
-                    return null;
-                }
-                continue;
-            }
-            if (routePart !== requestPart) {
-                return null;
-            }
+        const elapsedTime = Date.now() - info.startedAt;
+        console.log("");
+        console.log("Komichi Trail");
+        console.log("--------------------------------");
+        console.log(`${info.method} ${info.requestedPath}`);
+        if (info.matchedPath) {
+            console.log(`Route: ${info.matchedPath}`);
         }
-        return params;
-    }
-    findAllowedMethods(requestPath) {
-        const allowedMethods = [];
-        for (const registeredRoute of this.routes) {
-            const matchedParams = this.matchPath(registeredRoute.path, requestPath);
-            if (matchedParams !== null) {
-                allowedMethods.push(registeredRoute.method);
-            }
+        else {
+            console.log("Route: Not matched");
         }
-        return [...new Set(allowedMethods)];
-    }
-    calculateDistance(left, right) {
-        const rows = left.length + 1;
-        const columns = right.length + 1;
-        const matrix = Array.from({ length: rows }, () => Array(columns).fill(0));
-        for (let row = 0; row < rows; row++) {
-            matrix[row][0] = row;
+        if (info.params &&
+            Object.keys(info.params).length >
+                0) {
+            const formattedParams = Object.entries(info.params)
+                .map(([name, value]) => `${name}="${value}"`)
+                .join(", ");
+            console.log(`Params: ${formattedParams}`);
         }
-        for (let column = 0; column < columns; column++) {
-            matrix[0][column] = column;
+        if (info.query &&
+            [...info.query.entries()]
+                .length > 0) {
+            const formattedQuery = [
+                ...info.query.entries(),
+            ]
+                .map(([name, value]) => `${name}="${value}"`)
+                .join(", ");
+            console.log(`Query: ${formattedQuery}`);
         }
-        for (let row = 1; row < rows; row++) {
-            for (let column = 1; column < columns; column++) {
-                const cost = left[row - 1] ===
-                    right[column - 1]
-                    ? 0
-                    : 1;
-                matrix[row][column] =
-                    Math.min(matrix[row - 1][column] + 1, matrix[row][column - 1] + 1, matrix[row - 1][column - 1] + cost);
-            }
-        }
-        return matrix[left.length][right.length];
-    }
-    calculateSimilarity(requestedPath, registeredPath) {
-        const requestedParts = requestedPath
-            .split("/")
-            .filter((part) => part.length > 0);
-        const registeredParts = registeredPath
-            .split("/")
-            .filter((part) => part.length > 0);
-        const maximumLength = Math.max(requestedParts.length, registeredParts.length);
-        if (maximumLength === 0) {
-            return 1;
-        }
-        let totalScore = 0;
-        for (let index = 0; index < maximumLength; index++) {
-            const requestedPart = requestedParts[index];
-            const registeredPart = registeredParts[index];
-            if (requestedPart === undefined ||
-                registeredPart === undefined) {
-                continue;
-            }
-            if (registeredPart.startsWith(":")) {
-                totalScore += 1;
-                continue;
-            }
-            const distance = this.calculateDistance(requestedPart.toLowerCase(), registeredPart.toLowerCase());
-            const longestLength = Math.max(requestedPart.length, registeredPart.length);
-            if (longestLength === 0) {
-                totalScore += 1;
-                continue;
-            }
-            totalScore +=
-                1 -
-                    distance / longestLength;
-        }
-        return totalScore / maximumLength;
-    }
-    findRouteSuggestions(method, requestPath) {
-        const uniqueSuggestions = new Map();
-        for (const route of this.routes) {
-            const score = this.calculateSimilarity(requestPath, route.path);
-            const key = `${route.method}:${route.path}`;
-            uniqueSuggestions.set(key, {
-                method: route.method,
-                path: route.path,
-                score,
-            });
-        }
-        return [
-            ...uniqueSuggestions.values(),
-        ]
-            .filter((suggestion) => suggestion.score >= 0.45)
-            .sort((left, right) => {
-            const leftMethodMatch = left.method === method ? 1 : 0;
-            const rightMethodMatch = right.method === method ? 1 : 0;
-            if (leftMethodMatch !==
-                rightMethodMatch) {
-                return (rightMethodMatch -
-                    leftMethodMatch);
-            }
-            return (right.score -
-                left.score);
-        })
-            .slice(0, 3);
+        console.log(`Response: ${info.statusCode} ${info.responseType.toUpperCase()}`);
+        console.log(`Total: ${elapsedTime}ms`);
+        console.log("--------------------------------");
     }
     readJsonBody(request) {
         return new Promise((resolve, reject) => {
@@ -443,17 +281,20 @@ class Komichi {
         });
     }
     sendJson(response, statusCode, data) {
-        response.statusCode = statusCode;
+        response.statusCode =
+            statusCode;
         response.setHeader("Content-Type", "application/json; charset=utf-8");
         response.end(JSON.stringify(data));
     }
     sendText(response, statusCode, data) {
-        response.statusCode = statusCode;
+        response.statusCode =
+            statusCode;
         response.setHeader("Content-Type", "text/plain; charset=utf-8");
         response.end(data);
     }
     sendHtml(response, statusCode, data) {
-        response.statusCode = statusCode;
+        response.statusCode =
+            statusCode;
         response.setHeader("Content-Type", "text/html; charset=utf-8");
         response.end(data);
     }
@@ -463,3 +304,5 @@ var response_js_2 = require("./response.js");
 Object.defineProperty(exports, "KomichiResponse", { enumerable: true, get: function () { return response_js_2.KomichiResponse; } });
 var errors_js_2 = require("./errors.js");
 Object.defineProperty(exports, "BadRequestError", { enumerable: true, get: function () { return errors_js_2.BadRequestError; } });
+var router_js_2 = require("./router.js");
+Object.defineProperty(exports, "Router", { enumerable: true, get: function () { return router_js_2.Router; } });
