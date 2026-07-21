@@ -1,6 +1,7 @@
 import {
   createServer,
   type IncomingMessage,
+  type Server,
   type ServerResponse,
 } from "node:http";
 
@@ -211,25 +212,27 @@ export class Komichi {
     console.log("");
   }
 
-  listen(port: number): void {
-    const server = createServer(
-      async (
-        request: IncomingMessage,
-        response: ServerResponse,
-      ) => {
-        await this.handleRequest(
-          request,
-          response,
-        );
-      },
-    );
-
-    server.listen(port, () => {
-      console.log(
-        `Komichi is running on http://localhost:${port}`,
+  listen(port: number): Server {
+  const server = createServer(
+    async (
+      request: IncomingMessage,
+      response: ServerResponse,
+    ) => {
+      await this.handleRequest(
+        request,
+        response,
       );
-    });
-  }
+    },
+  );
+
+  server.listen(port, () => {
+    console.log(
+      `Komichi is running on http://localhost:${port}`,
+    );
+  });
+
+  return server;
+}
 
   private async handleRequest(
     request: IncomingMessage,

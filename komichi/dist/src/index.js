@@ -64,6 +64,7 @@ export class Komichi {
         server.listen(port, () => {
             console.log(`Komichi is running on http://localhost:${port}`);
         });
+        return server;
     }
     async handleRequest(request, response) {
         const startedAt = Date.now();

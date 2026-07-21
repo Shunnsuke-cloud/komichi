@@ -1,3 +1,4 @@
+import { type Server } from "node:http";
 import { KomichiResponse } from "./response.js";
 import { type Params } from "./router.js";
 export type JsonBody = Record<string, unknown>;
@@ -19,7 +20,7 @@ export declare class Komichi {
     text(data: string, statusCode?: number): KomichiResponse;
     html(data: string, statusCode?: number): KomichiResponse;
     printRoutes(): void;
-    listen(port: number): void;
+    listen(port: number): Server;
     private handleRequest;
     private readJsonBody;
     private sendJson;
