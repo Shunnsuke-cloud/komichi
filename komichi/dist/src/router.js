@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Router = void 0;
-class Router {
+export class Router {
     routes = [];
     add(method, path, handler, description) {
         this.routes.push({
@@ -159,4 +156,3 @@ class Router {
         return matrix[left.length][right.length];
     }
 }
-exports.Router = Router;

@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.KomichiResponse = void 0;
-class KomichiResponse {
+export class KomichiResponse {
     body;
     statusCode;
     type;
@@ -11,4 +8,3 @@ class KomichiResponse {
         this.type = type;
     }
 }
-exports.KomichiResponse = KomichiResponse;

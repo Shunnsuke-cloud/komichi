@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Trail = void 0;
-class Trail {
+export class Trail {
     enabled;
     constructor(enabled) {
         this.enabled = enabled;
@@ -42,4 +39,3 @@ class Trail {
         console.log("--------------------------------");
     }
 }
-exports.Trail = Trail;

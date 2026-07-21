@@ -1,7 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const index_js_1 = require("../src/index.js");
-const app = new index_js_1.Komichi({
+import { Komichi } from "../src/index.js";
+const app = new Komichi({
     trail: true,
 });
 app.get("/", () => {
