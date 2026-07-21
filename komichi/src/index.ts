@@ -459,66 +459,64 @@ export class Komichi {
         200,
         result,
       );
+    
     } catch (error) {
-      console.error(error);
+  if (
+    error instanceof
+    BadRequestError
+  ) {
+    this.trail.print({
+      method,
+      requestedPath:
+        url.pathname,
+      matchedPath:
+        matchedRoute.path,
+      params,
+      query:
+        url.searchParams,
+      statusCode: 400,
+      responseType: "json",
+      startedAt,
+    });
 
-      if (
-        error instanceof
-        BadRequestError
-      ) {
-        this.trail.print({
-          method,
-          requestedPath:
-            url.pathname,
-          matchedPath:
-            matchedRoute.path,
-          params,
-          query:
-            url.searchParams,
-          statusCode: 400,
-          responseType: "json",
-          startedAt,
-        });
+    this.sendJson(
+      response,
+      400,
+      {
+        message:
+          error.message,
+      },
+    );
 
-        this.sendJson(
-          response,
-          400,
-          {
-            message:
-              error.message,
-          },
-        );
-
-        return;
-      }
-
-      this.trail.print({
-        method,
-        requestedPath:
-          url.pathname,
-        matchedPath:
-          matchedRoute.path,
-        params,
-        query:
-          url.searchParams,
-        statusCode: 500,
-        responseType: "json",
-        startedAt,
-      });
-
-      this.sendJson(
-        response,
-        500,
-        {
-          message:
-            "Internal Server Error",
-        },
-      );
-    }
+    return;
   }
 
+  console.error(error);
 
+  this.trail.print({
+    method,
+    requestedPath:
+      url.pathname,
+    matchedPath:
+      matchedRoute.path,
+    params,
+    query:
+      url.searchParams,
+    statusCode: 500,
+    responseType: "json",
+    startedAt,
+  });
 
+  this.sendJson(
+    response,
+    500,
+    {
+      message:
+        "Internal Server Error",
+    },
+    );
+    }
+}
   private readJsonBody(
     request: IncomingMessage,
   ): Promise<JsonBody> {

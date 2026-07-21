@@ -174,7 +174,6 @@ export class Komichi {
             this.sendJson(response, 200, result);
         }
         catch (error) {
-            console.error(error);
             if (error instanceof
                 BadRequestError) {
                 this.trail.print({
@@ -192,6 +191,7 @@ export class Komichi {
                 });
                 return;
             }
+            console.error(error);
             this.trail.print({
                 method,
                 requestedPath: url.pathname,
