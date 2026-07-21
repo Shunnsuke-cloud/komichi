@@ -16,6 +16,8 @@ import {
   type Params,
 } from "./router.js";
 
+import { Trail } from "./trail.js";
+
 export type JsonBody = Record<
   string,
   unknown
@@ -36,28 +38,19 @@ export type KomichiOptions = {
   trail?: boolean;
 };
 
-type TrailInfo = {
-  method: string;
-  requestedPath: string;
-  matchedPath?: string;
-  params?: Params;
-  query?: URLSearchParams;
-  statusCode: number;
-  responseType: ResponseType;
-  startedAt: number;
-};
 
 export class Komichi {
   private readonly router =
     new Router<Handler>();
 
-  private readonly trailEnabled: boolean;
+  private readonly trail: Trail;
 
   constructor(
     options: KomichiOptions = {},
   ) {
-    this.trailEnabled =
-      options.trail ?? false;
+    this.trail = new Trail(
+      options.trail ?? false
+    );
   }
 
   get(
@@ -275,7 +268,7 @@ export class Komichi {
           allowedMethods.join(", "),
         );
 
-        this.printTrail({
+        this.trail.print({
           method,
           requestedPath: url.pathname,
           query: url.searchParams,
@@ -306,7 +299,7 @@ export class Komichi {
           url.pathname,
         );
 
-      this.printTrail({
+      this.trail.print({
         method,
         requestedPath: url.pathname,
         query: url.searchParams,
@@ -375,7 +368,7 @@ export class Komichi {
         result instanceof
         KomichiResponse
       ) {
-        this.printTrail({
+        this.trail.print({
           method,
           requestedPath:
             url.pathname,
@@ -421,7 +414,7 @@ export class Komichi {
       }
 
       if (typeof result === "string") {
-        this.printTrail({
+        this.trail.print({
           method,
           requestedPath:
             url.pathname,
@@ -444,7 +437,7 @@ export class Komichi {
         return;
       }
 
-      this.printTrail({
+      this.trail.print({
         method,
         requestedPath:
           url.pathname,
@@ -470,7 +463,7 @@ export class Komichi {
         error instanceof
         BadRequestError
       ) {
-        this.printTrail({
+        this.trail.print({
           method,
           requestedPath:
             url.pathname,
@@ -496,7 +489,7 @@ export class Komichi {
         return;
       }
 
-      this.printTrail({
+      this.trail.print({
         method,
         requestedPath:
           url.pathname,
@@ -521,85 +514,7 @@ export class Komichi {
     }
   }
 
-  private printTrail(
-    info: TrailInfo,
-  ): void {
-    if (!this.trailEnabled) {
-      return;
-    }
 
-    const elapsedTime =
-      Date.now() - info.startedAt;
-
-    console.log("");
-    console.log("Komichi Trail");
-    console.log(
-      "--------------------------------",
-    );
-
-    console.log(
-      `${info.method} ${info.requestedPath}`,
-    );
-
-    if (info.matchedPath) {
-      console.log(
-        `Route: ${info.matchedPath}`,
-      );
-    } else {
-      console.log(
-        "Route: Not matched",
-      );
-    }
-
-    if (
-      info.params &&
-      Object.keys(info.params).length >
-        0
-    ) {
-      const formattedParams =
-        Object.entries(info.params)
-          .map(
-            ([name, value]) =>
-              `${name}="${value}"`,
-          )
-          .join(", ");
-
-      console.log(
-        `Params: ${formattedParams}`,
-      );
-    }
-
-    if (
-      info.query &&
-      [...info.query.entries()]
-        .length > 0
-    ) {
-      const formattedQuery = [
-        ...info.query.entries(),
-      ]
-        .map(
-          ([name, value]) =>
-            `${name}="${value}"`,
-        )
-        .join(", ");
-
-      console.log(
-        `Query: ${formattedQuery}`,
-      );
-    }
-
-    console.log(
-      `Response: ${info.statusCode} ${info.responseType.toUpperCase()}`,
-    );
-
-    console.log(
-      `Total: ${elapsedTime}ms`,
-    );
-
-    console.log(
-      "--------------------------------",
-    );
-  }
 
   private readJsonBody(
     request: IncomingMessage,
@@ -739,3 +654,8 @@ export {
   type Route,
   type RouteSuggestion,
 } from "./router.js";
+
+export {
+  Trail,
+  type TrailInfo,
+} from "./trail.js";

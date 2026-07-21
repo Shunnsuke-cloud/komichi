@@ -1,16 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Router = exports.BadRequestError = exports.KomichiResponse = exports.Komichi = void 0;
+exports.Trail = exports.Router = exports.BadRequestError = exports.KomichiResponse = exports.Komichi = void 0;
 const node_http_1 = require("node:http");
 const errors_js_1 = require("./errors.js");
 const response_js_1 = require("./response.js");
 const router_js_1 = require("./router.js");
+const trail_js_1 = require("./trail.js");
 class Komichi {
     router = new router_js_1.Router();
-    trailEnabled;
+    trail;
     constructor(options = {}) {
-        this.trailEnabled =
-            options.trail ?? false;
+        this.trail = new trail_js_1.Trail(options.trail ?? false);
     }
     get(path, handler, description) {
         this.router.add("GET", path, handler, description);
@@ -79,7 +79,7 @@ class Komichi {
             const allowedMethods = this.router.findAllowedMethods(url.pathname);
             if (allowedMethods.length > 0) {
                 response.setHeader("Allow", allowedMethods.join(", "));
-                this.printTrail({
+                this.trail.print({
                     method,
                     requestedPath: url.pathname,
                     query: url.searchParams,
@@ -96,7 +96,7 @@ class Komichi {
                 return;
             }
             const suggestions = this.router.findSuggestions(method, url.pathname);
-            this.printTrail({
+            this.trail.print({
                 method,
                 requestedPath: url.pathname,
                 query: url.searchParams,
@@ -128,7 +128,7 @@ class Komichi {
             const result = await matchedRoute.handler(params, url.searchParams, body);
             if (result instanceof
                 response_js_1.KomichiResponse) {
-                this.printTrail({
+                this.trail.print({
                     method,
                     requestedPath: url.pathname,
                     matchedPath: matchedRoute.path,
@@ -150,7 +150,7 @@ class Komichi {
                 return;
             }
             if (typeof result === "string") {
-                this.printTrail({
+                this.trail.print({
                     method,
                     requestedPath: url.pathname,
                     matchedPath: matchedRoute.path,
@@ -163,7 +163,7 @@ class Komichi {
                 this.sendText(response, 200, result);
                 return;
             }
-            this.printTrail({
+            this.trail.print({
                 method,
                 requestedPath: url.pathname,
                 matchedPath: matchedRoute.path,
@@ -179,7 +179,7 @@ class Komichi {
             console.error(error);
             if (error instanceof
                 errors_js_1.BadRequestError) {
-                this.printTrail({
+                this.trail.print({
                     method,
                     requestedPath: url.pathname,
                     matchedPath: matchedRoute.path,
@@ -194,7 +194,7 @@ class Komichi {
                 });
                 return;
             }
-            this.printTrail({
+            this.trail.print({
                 method,
                 requestedPath: url.pathname,
                 matchedPath: matchedRoute.path,
@@ -208,43 +208,6 @@ class Komichi {
                 message: "Internal Server Error",
             });
         }
-    }
-    printTrail(info) {
-        if (!this.trailEnabled) {
-            return;
-        }
-        const elapsedTime = Date.now() - info.startedAt;
-        console.log("");
-        console.log("Komichi Trail");
-        console.log("--------------------------------");
-        console.log(`${info.method} ${info.requestedPath}`);
-        if (info.matchedPath) {
-            console.log(`Route: ${info.matchedPath}`);
-        }
-        else {
-            console.log("Route: Not matched");
-        }
-        if (info.params &&
-            Object.keys(info.params).length >
-                0) {
-            const formattedParams = Object.entries(info.params)
-                .map(([name, value]) => `${name}="${value}"`)
-                .join(", ");
-            console.log(`Params: ${formattedParams}`);
-        }
-        if (info.query &&
-            [...info.query.entries()]
-                .length > 0) {
-            const formattedQuery = [
-                ...info.query.entries(),
-            ]
-                .map(([name, value]) => `${name}="${value}"`)
-                .join(", ");
-            console.log(`Query: ${formattedQuery}`);
-        }
-        console.log(`Response: ${info.statusCode} ${info.responseType.toUpperCase()}`);
-        console.log(`Total: ${elapsedTime}ms`);
-        console.log("--------------------------------");
     }
     readJsonBody(request) {
         return new Promise((resolve, reject) => {
@@ -306,3 +269,5 @@ var errors_js_2 = require("./errors.js");
 Object.defineProperty(exports, "BadRequestError", { enumerable: true, get: function () { return errors_js_2.BadRequestError; } });
 var router_js_2 = require("./router.js");
 Object.defineProperty(exports, "Router", { enumerable: true, get: function () { return router_js_2.Router; } });
+var trail_js_2 = require("./trail.js");
+Object.defineProperty(exports, "Trail", { enumerable: true, get: function () { return trail_js_2.Trail; } });

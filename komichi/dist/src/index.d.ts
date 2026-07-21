@@ -8,7 +8,7 @@ export type KomichiOptions = {
 };
 export declare class Komichi {
     private readonly router;
-    private readonly trailEnabled;
+    private readonly trail;
     constructor(options?: KomichiOptions);
     get(path: string, handler: Handler, description?: string): void;
     post(path: string, handler: Handler, description?: string): void;
@@ -21,7 +21,6 @@ export declare class Komichi {
     printRoutes(): void;
     listen(port: number): void;
     private handleRequest;
-    private printTrail;
     private readJsonBody;
     private sendJson;
     private sendText;
@@ -30,3 +29,4 @@ export declare class Komichi {
 export { KomichiResponse, type ResponseType, } from "./response.js";
 export { BadRequestError, } from "./errors.js";
 export { Router, type Params, type Route, type RouteSuggestion, } from "./router.js";
+export { Trail, type TrailInfo, } from "./trail.js";
