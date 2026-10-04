@@ -6,7 +6,8 @@ export type ResponseType =
 export class KomichiResponse {
   constructor(
     public readonly body: unknown,
-    public readonly statusCode: number,
+    public statusCode: number,
     public readonly type: ResponseType,
+    public readonly headers: Record<string, string | string[]> = {},
   ) {}
 }
