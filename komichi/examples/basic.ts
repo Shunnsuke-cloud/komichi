@@ -1,126 +1,36 @@
-import { Komichi } from "../src/index.js";
+﻿import { Komichi, KomichiError } from "../src/index.js";
 
-const app = new Komichi({
-  trail: true,
+const app = new Komichi({ trail: true, bodyLimit: 1024 * 1024 });
+
+app.use(async (c, next) => {
+  const start = Date.now();
+  await next();
+  c.header("X-Response-Time", `${Date.now() - start}ms`);
 });
 
-app.get(
-  "/",
-  () => {
-    return {
-      framework: "Komichi",
-      message: "Hello Komichi",
-    };
-  },
-  "Komichiの基本情報",
-);
+app.get("/", c => c.json({ framework: "Komichi", message: "Hello Komichi" }), "Komichiの基本情報");
 
-app.get(
-  "/hello",
-  () => {
-    return "こんにちは、Komichiです";
-  },
-  "挨拶を表示",
-);
+const users = app.group("/users");
+users.get("/", c => c.json({ users: [] }), "ユーザー一覧");
+users.get("/:id", c => {
+  if (c.params.id === "missing") throw new KomichiError(404, "User not found");
+  return c.json({ id: c.params.id });
+}, "ユーザー詳細");
+users.post("/", c => c.json({ user: c.body }, 201), "ユーザー登録");
+users.put("/:id", c => c.json({ id: c.params.id, user: c.body }));
+users.patch("/:id", c => c.json({ id: c.params.id, updates: c.body }));
+users.delete("/:id", c => c.text("", 204));
+users.group("/:id/posts").get("/:postId", c => c.json({ userId: c.params.id, postId: c.params.postId }));
 
-app.get(
-  "/users/:id",
-  (params) => {
-    return {
-      message: "ユーザー情報を取得しました",
-      userId: params.id,
-    };
-  },
-  "ユーザー詳細を取得",
-);
-
-app.post(
-  "/users",
-  (_params, _query, body) => {
-    return app.json(
-      {
-        message: "ユーザー情報を受け取りました",
-        name: body.name,
-        email: body.email,
-      },
-      201,
-    );
-  },
-  "ユーザーを登録",
-);
-
-app.get(
-  "/search",
-  (_params, query) => {
-    const keyword = query.get("keyword");
-    const page = query.get("page");
-
-    return {
-      message: "検索条件を取得しました",
-      keyword,
-      page,
-    };
-  },
-  "検索条件を取得",
-);
-
-app.put(
-  "/users/:id",
-  (params, _query, body) => {
-    return {
-      message: "ユーザー情報を更新しました",
-      userId: params.id,
-      name: body.name,
-      email: body.email,
-    };
-  },
-  "ユーザー情報を更新",
-);
-
-app.patch(
-  "/users/:id",
-  (params, _query, body) => {
-    return {
-      message: "ユーザー情報を一部更新しました",
-      userId: params.id,
-      updatedData: body,
-    };
-  },
-  "ユーザー情報を一部更新",
-);
-
-app.delete(
-  "/users/:id",
-  (params) => {
-    return {
-      message: "ユーザーを削除しました",
-      userId: params.id,
-    };
-  },
-  "ユーザーを削除",
-);
-
-app.get(
-  "/page",
-  () => {
-    return app.html(`
-      <!DOCTYPE html>
-      <html lang="ja">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Komichi</title>
-        </head>
-        <body>
-          <h1>Komichi</h1>
-          <p>HTMLレスポンスに対応しました。</p>
-        </body>
-      </html>
-    `);
-  },
-  "HTMLページを表示",
-);
+app.get("/search", c => c.json({ keyword: c.query.get("keyword"), page: c.query.get("page") }));
+app.get("/hello", c => c.text("こんにちは、Komichiです"));
+app.get("/page", c => c.html("<h1>Komichi</h1>"));
+app.get("/old", c => c.redirect("/users", 307));
+app.get("/cookie", c => {
+  const previous = c.cookie("visitor");
+  c.cookie("visitor", "Komichi", { httpOnly: true, sameSite: "Lax" });
+  return c.json({ previous: previous ?? null });
+});
 
 app.printRoutes();
-
 app.listen(3000);
